@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Теплове розширення тіл: інтерактивний тренажер (8 клас)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        /* Кастомний повзунок температури з градієнтом холод -> тепло */
+        input[type="range"].temp-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 10px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #3b82f6 0%, #38bdf8 13%, #facc15 45%, #f97316 75%, #ef4444 100%);
+            outline: none;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="range"].temp-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid #1e293b;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+            transition: transform 0.15s ease;
+        }
+
+        input[type="range"].temp-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.12);
+        }
+
+        input[type="range"].temp-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid #1e293b;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+        }
+
+        .canvas-box {
+            position: relative;
+            width: 100%;
+            height: 310px;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+
+        @media (min-width: 640px) {
+            .canvas-box {
+                height: 340px;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Верхня навігаційна панель -->
+    <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white shadow-md shrink-0">
+                    <!-- SVG Іконка термометра та атомів -->
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-extrabold text-slate-800 leading-tight">
+                        Теплове розширення тіл: інтерактивний тренажер (8 клас)
+                    </h1>
+                    <p class="text-xs text-slate-500">Фізика • Молекулярна будова речовини та теплові явища</p>
+                </div>
+            </div>
+
+            <!-- Вкладки вибору агрегатного стану -->
+            <div class="flex flex-wrap gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200" role="tablist">
+                <button id="tab-solid" onclick="selectMaterial('solid')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-blue-700 shadow-sm">
+                    🧱 Тверде тіло (Мідь)
+                </button>
+                <button id="tab-liquid" onclick="selectMaterial('liquid')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 hover:text-slate-900">
+                    💧 Рідина (Вода)
+                </button>
+                <button id="tab-gas" onclick="selectMaterial('gas')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 hover:text-slate-900">
+                    💨 Газ (Повітря)
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Основний робочий простір -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 flex-grow flex flex-col gap-5">
+
+        <!-- Панель керування температурою та швидкі кнопки -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+                
+                <!-- Повзунок температури -->
+                <div class="lg:col-span-6 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <label for="tempSlider" class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                            <span>🌡️ Температура нагрівника:</span>
+                            <span id="badgeTempState" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                                Кімнатна
+                            </span>
+                        </label>
+                        <div class="text-right font-mono">
+                            <span id="headerTempC" class="text-lg font-extrabold text-slate-900">+20 °C</span>
+                            <span class="text-xs text-slate-500 ml-1">(<span id="headerTempK">293</span> К)</span>
+                        </div>
+                    </div>
+                    <input type="range" id="tempSlider" min="-50" max="500" value="20" step="1" class="temp-slider w-full my-1" oninput="onTempInput(this.value)">
+                    <div class="flex justify-between text-[11px] font-medium text-slate-400 px-0.5">
+                        <span>-50 °C (Холод)</span>
+                        <span>+20 °C</span>
+                        <span>+250 °C</span>
+                        <span>+500 °C (Сильний нагрів)</span>
+                    </div>
+                </div>
+
+                <!-- Кнопки швидкого керування -->
+                <div class="lg:col-span-6 flex flex-wrap items-center justify-start lg:justify-end gap-2">
+                    <button onclick="setTargetTemp(-50)" class="px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition active:scale-95">
+                        ❄️ Охолодити (-50 °C)
+                    </button>
+                    <button onclick="setTargetTemp(20)" class="px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition active:scale-95">
+                        🏠 Кімнатна (20 °C)
+                    </button>
+                    <button onclick="setTargetTemp(400)" class="px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition active:scale-95">
+                        🔥 Нагріти (+400 °C)
+                    </button>
+                    <button id="btnPause" onclick="togglePause()" class="px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-white transition active:scale-95">
+                        ⏸️ Пауза
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Подвійна візуалізація: Макросвіт та Мікросвіт -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            
+            <!-- Ліве вікно: Макросвіт -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                            Макросвіт: зміна розмірів тіла
+                        </h2>
+                        <p id="macroSubtitle" class="text-xs text-slate-500">Металевий мідний стрижень на вимірювальній лінійці</p>
+                    </div>
+                    
+                    <!-- Перемикач збільшення масштабу розширення -->
+                    <label class="inline-flex items-center gap-2 cursor-pointer bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl select-none">
+                        <input type="checkbox" id="chkMagnify" checked onchange="toggleMagnify(this.checked)" class="w-4 h-4 rounded text-amber-600 focus:ring-0">
+                        <span class="text-xs font-semibold text-amber-900">🔍 Збільшити масштаб ΔL / ΔV</span>
+                    </label>
+                </div>
+
+                <div class="canvas-box">
+                    <canvas id="macroCanvas"></canvas>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-600 flex items-start gap-2">
+                    <span class="text-base leading-none">💡</span>
+                    <p id="macroHint">
+                        У реальності мідний стрижень довжиною 100 мм при нагріванні на 380 °C видовжується лише на ~0,63 мм. Увімкнений «Збільшений масштаб» підсилює цей приріст для наочності.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Праве вікно: Мікросвіт -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                            Мікросвіт: рух частинок (збільшено у 10⁸ разів)
+                        </h2>
+                        <p id="microSubtitle" class="text-xs text-slate-500">Кристалічна ґратка атомів міді</p>
+                    </div>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
+                        Розмір атомів не змінюється!
+                    </span>
+                </div>
+
+                <div class="canvas-box">
+                    <canvas id="microCanvas"></canvas>
+                </div>
+
+                <div class="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 text-xs text-blue-900 flex items-start gap-2">
+                    <span class="text-base leading-none">🔬</span>
+                    <p id="microHint">
+                        При підвищенні температури зростає кінетична енергія та амплітуда коливань атомів. Вони сильніше відштовхуються, тому середня відстань між ними збільшується.
+                    </p>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Панель вимірювань, формул та розрахунків -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    📐 Панель вимірювань та фізичних розрахунків
+                </h2>
+                <div id="coeffBadge" class="text-xs font-semibold px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Коефіцієнт лінійного розширення міді: α = 16,5 × 10⁻⁶ 1/°C
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <!-- Картка 1: Температура -->
+                <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Температура (t / T)</div>
+                    <div class="mt-1 flex items-baseline gap-2">
+                        <span id="statTempC" class="text-2xl font-extrabold text-slate-900">+20 °C</span>
+                        <span id="statTempK" class="text-sm font-semibold text-slate-500">293 К</span>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                        Зміна Δt = <span id="statDeltaT" class="font-bold text-slate-700">0 °C</span> (від 20 °C)
+                    </div>
+                </div>
+
+                <!-- Картка 2: Початковий розмір -->
+                <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80">
+                    <div id="statInitLabel" class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Початкова довжина (L₀)</div>
+                    <div class="mt-1 flex items-baseline gap-2">
+                        <span id="statInitVal" class="text-2xl font-extrabold text-slate-800">100,00 мм</span>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                        За температури t₀ = 20 °C
+                    </div>
+                </div>
+
+                <!-- Картка 3: Поточний розмір -->
+                <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80">
+                    <div id="statCurrLabel" class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Поточна довжина (L)</div>
+                    <div class="mt-1 flex items-baseline gap-2">
+                        <span id="statCurrVal" class="text-2xl font-extrabold text-blue-700">100,00 мм</span>
+                    </div>
+                    <div id="statCurrNote" class="mt-1 text-xs text-slate-500">
+                        L = L₀ + ΔL
+                    </div>
+                </div>
+
+                <!-- Картка 4: Приріст та формула -->
+                <div class="bg-amber-50/70 rounded-xl p-3.5 border border-amber-200">
+                    <div id="statDeltaLabel" class="text-xs font-semibold text-amber-800 uppercase tracking-wide">Приріст довжини (ΔL)</div>
+                    <div class="mt-1 flex items-baseline gap-2">
+                        <span id="statDeltaVal" class="text-2xl font-extrabold text-amber-700">0,000 мм</span>
+                    </div>
+                    <div id="statFormula" class="mt-1 text-xs font-mono font-semibold text-amber-900">
+                        Формула: ΔL = α · L₀ · Δt
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Блок «Перевір себе (Міні-тест)» -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-100">
+                <div>
+                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        ✅ Перевір себе (Міні-тест для 8 класу)
+                    </h2>
+                    <p class="text-xs text-slate-500">Обери правильну відповідь та отримай миттєве пояснення</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Результат: <span id="quizScore">0</span> / 4
+                    </span>
+                    <button onclick="resetQuiz()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 underline">
+                        Пройти знову
+                    </button>
+                </div>
+            </div>
+
+            <div id="quizGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Питання генеруються через JavaScript -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Підвал -->
+    <footer class="bg-white border-t border-slate-200 py-3 px-4 text-center text-xs text-slate-500 mt-4">
+        Інтерактивний навчальний посібник з фізики для учнів 8 класу • Тема: «Теплове розширення тіл»
+    </footer>
+
+    <script>
+        // ==========================================
+        // 1. КОНФІГУРАЦІЯ ТА ФІЗИЧНІ ДАНІ РЕЧОВИН
+        // ==========================================
+        const MATERIALS = {
+            solid: {
+                id: 'solid',
+                name: 'Тверде тіло (Мідь)',
+                coeffName: 'Коефіцієнт лінійного розширення міді: α = 16,5 × 10⁻⁶ 1/°C',
+                coeff: 16.5e-6,
+                initValue: 100.0, // мм
+                unit: 'мм',
+                initLabel: 'Початкова довжина (L₀)',
+                currLabel: 'Поточна довжина (L)',
+                deltaLabel: 'Приріст довжини (ΔL)',
+                currNote: 'L = L₀ + ΔL',
+                formulaText: 'Формула: ΔL = α · L₀ · Δt',
+                macroSubtitle: 'Металевий мідний стрижень на вимірювальній лінійці',
+                microSubtitle: 'Кристалічна ґратка атомів міді',
+                macroHint: 'У реальності мідний стрижень довжиною 100 мм при нагріванні на 380 °C видовжується лише на ~0,63 мм. Увімкнений «Збільшений масштаб» підсилює цей приріст для наочності.',
+                microHint: 'При підвищенні температури зростає кінетична енергія та амплітуда коливань атомів у вузлах ґратки. Вони сильніше відштовхуються, тому середня відстань між ними збільшується.',
+                visualGain: 75 // коефіцієнт візуального підсилення для наочності
+            },
+            liquid: {
+                id: 'liquid',
+                name: 'Рідина (Вода)',
+                coeffName: 'Коефіцієнт об’ємного розширення води: β = 2,1 × 10⁻⁴ 1/°C',
+                coeff: 2.1e-4,
+                initValue: 100.0, // мл
+                unit: 'мл',
+                initLabel: 'Початковий об’єм (V₀)',
+                currLabel: 'Поточний об’єм (V)',
+                deltaLabel: 'Приріст об’єму (ΔV)',
+                currNote: 'V = V₀ + ΔV',
+                formulaText: 'Формула: ΔV = β · V₀ · Δt',
+                macroSubtitle: 'Скляна колба з капілярною трубкою (модель рідинного термометра)',
+                microSubtitle: 'Щільно розташовані рухливі молекули води',
+                macroHint: 'Рідини розширюються при нагріванні значно сильніше, ніж тверді тіла (приблизно в 10–100 разів). Саме ця властивість використовується у рідинних термометрах.',
+                microHint: 'Молекули рідини розташовані близько одна до одної, але не прив’язані до одного місця — вони перекочуються. При нагріванні рух прискорюється, і проміжки між молекулами зростають.',
+                visualGain: 7.5
+            },
+            gas: {
+                id: 'gas',
+                name: 'Газ (Повітря)',
+                coeffName: 'Коефіцієнт об’ємного розширення газу (при P = const): β = 3,66 × 10⁻³ 1/°C',
+                coeff: 3.66e-3,
+                initValue: 100.0, // мл
+                unit: 'мл',
+                initLabel: 'Початковий об’єм (V₀)',
+                currLabel: 'Поточний об’єм (V)',
+                deltaLabel: 'Приріст об’єму (ΔV)',
+                currNote: 'V = V₀ + ΔV (при сталому тиску)',
+                formulaText: 'Формула: ΔV = β · V₀ · Δt',
+                macroSubtitle: 'Циліндр із легким рухомим поршнем (сталий атмосферний тиск)',
+                microSubtitle: 'Хаотично літаючі молекули повітря',
+                macroHint: 'Гази розширюються найсильніше! При нагріванні повітря від 20 °C до 293 °C його об’єм збільшується майже вдвічі, піднімаючи поршень угору.',
+                microHint: 'Між молекулами газу майже немає сил притягання. При нагріванні молекули рухаються набагато швидше, частіше й сильніше вдаряються об поршень і піднімають його.',
+                visualGain: 1.0 // у газів розширення величезне і без підсилення
+            }
+        };
+
+        // ==========================================
+        // 2. СТАН СИМУЛЯЦІЇ
+        // ==========================================
+        let currentMaterialKey = 'solid';
+        let currentTemp = 20;      // поточна анімована температура (°C)
+        let targetTemp = 20;       // цільова температура (°C)
+        let isMagnified = true;    // збільшення масштабу розширення
+        let isPaused = false;      // пауза анімації
+
+        // Елементи Canvas
+        const macroCanvas = document.getElementById('macroCanvas');
+        const macroCtx = macroCanvas.getContext('2d');
+        const microCanvas = document.getElementById('microCanvas');
+        const microCtx = microCanvas.getContext('2d');
+
+        // Частинки для мікросвіту
+        let microParticles = [];
+        let lastTime = 0;
+
+        // ==========================================
+        // 3. ІНІЦІАЛІЗАЦІЯ PARTICLE ENGINE ДЛЯ МІКРОСВІТУ
+        // ==========================================
+        function initMicroParticles() {
+            microParticles = [];
+            const w = microCanvas.width || 500;
+            const h = microCanvas.height || 320;
+
+            if (currentMaterialKey === 'solid') {
+                // Впорядкована кристалічна ґратка (7 стовпців x 5 рядів)
+                const cols = 7;
+                const rows = 5;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        microParticles.push({
+                            gridCol: c - (cols - 1) / 2,
+                            gridRow: r - (rows - 1) / 2,
+                            phaseX: Math.random() * Math.PI * 2,
+                            phaseY: Math.random() * Math.PI * 2,
+                            freqX: 0.85 + Math.random() * 0.3,
+                            freqY: 0.85 + Math.random() * 0.3,
+                            x: w / 2,
+                            y: h / 2
+                        });
+                    }
+                }
+            } else if (currentMaterialKey === 'liquid') {
+                // Щільно розташовані рухливі молекули води
+                const count = 42;
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    microParticles.push({
+                        x: 40 + Math.random() * (w - 80),
+                        y: 60 + Math.random() * (h - 90),
+                        vx: Math.cos(angle),
+                        vy: Math.sin(angle),
+                        radius: 11
+                    });
+                }
+            } else {
+                // Хаотично літаючі молекули газу
+                const count = 26;
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    microParticles.push({
+                        x: 30 + Math.random() * (w - 60),
+                        y: 30 + Math.random() * (h - 60),
+                        vx: Math.cos(angle),
+                        vy: Math.sin(angle),
+                        radius: 9,
+                        isOxygen: i % 5 === 0 // частина молекул червоні (O2), інші сині (N2)
+                    });
+                }
+            }
+        }
+
+        // Адаптація розмірів обох Canvas під контейнер
+        function resizeCanvases() {
+            [macroCanvas, microCanvas].forEach(canvas => {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                const ctx = canvas.getContext('2d');
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            });
+            initMicroParticles();
+        }
+
+        window.addEventListener('resize', resizeCanvases);
+
+        // ==========================================
+        // 4. КЕРУВАННЯ ІНТЕРФЕЙСОМ ТА ТЕМПЕРАТУРОЮ
+        // ==========================================
+        function selectMaterial(matKey) {
+            currentMaterialKey = matKey;
+            const mat = MATERIALS[matKey];
+
+            // Оновлення стилів вкладок
+            ['solid', 'liquid', 'gas'].forEach(key => {
+                const btn = document.getElementById(`tab-${key}`);
+                if (key === matKey) {
+                    btn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-blue-700 shadow-sm';
+                } else {
+                    btn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 hover:text-slate-900';
+                }
+            });
+
+            // Оновлення текстів інтерфейсу
+            document.getElementById('macroSubtitle').textContent = mat.macroSubtitle;
+            document.getElementById('microSubtitle').textContent = mat.microSubtitle;
+            document.getElementById('macroHint').textContent = mat.macroHint;
+            document.getElementById('microHint').textContent = mat.microHint;
+            document.getElementById('coeffBadge').textContent = mat.coeffName;
+
+            document.getElementById('statInitLabel').textContent = mat.initLabel;
+            document.getElementById('statCurrLabel').textContent = mat.currLabel;
+            document.getElementById('statDeltaLabel').textContent = mat.deltaLabel;
+            document.getElementById('statCurrNote').textContent = mat.currNote;
+            document.getElementById('statFormula').textContent = mat.formulaText;
+
+            initMicroParticles();
+            updateReadouts();
+        }
+
+        function onTempInput(val) {
+            targetTemp = parseFloat(val);
+            currentTemp = targetTemp; // миттєва реакція при русі повзунка рукою
+            updateReadouts();
+        }
+
+        function setTargetTemp(val) {
+            targetTemp = val;
+            document.getElementById('tempSlider').value = val;
+            if (isPaused) {
+                currentTemp = targetTemp;
+                updateReadouts();
+            }
+        }
+
+        function toggleMagnify(checked) {
+            isMagnified = checked;
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('btnPause');
+            if (isPaused) {
+                btn.innerHTML = '▶️ Продовжити';
+                btn.classList.replace('bg-slate-800', 'bg-emerald-600');
+                btn.classList.replace('hover:bg-slate-700', 'hover:bg-emerald-500');
+            } else {
+                btn.innerHTML = '⏸️ Пауза';
+                btn.classList.replace('bg-emerald-600', 'bg-slate-800');
+                btn.classList.replace('hover:bg-emerald-500', 'hover:bg-slate-700');
+            }
+        }
+
+        function formatSign(num, decimals = 2) {
+            const formatted = num.toFixed(decimals).replace('.', ',');
+            return num > 0 ? `+${formatted}` : formatted;
+        }
+
+        // Оновлення всіх числових показників на панелі вимірювань
+        function updateReadouts() {
+            const mat = MATERIALS[currentMaterialKey];
+            const tC = currentTemp;
+            const tK = tC + 273.15;
+            const deltaT = tC - 20.0;
+
+            // Фізичний розрахунок приросту: ΔL = α * L0 * Δt  або  ΔV = β * V0 * Δt
+            const deltaVal = mat.coeff * mat.initValue * deltaT;
+            const currVal = mat.initValue + deltaVal;
+
+            // Заголовок температури
+            document.getElementById('headerTempC').textContent = `${formatSign(tC, 0)} °C`;
+            document.getElementById('headerTempK').textContent = Math.round(tK);
+
+            // Бейдж стану температури
+            const badge = document.getElementById('badgeTempState');
+            if (tC < 0) {
+                badge.textContent = '❄️ Охолодження';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700';
+            } else if (tC <= 35) {
+                badge.textContent = '🏠 Кімнатна';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700';
+            } else if (tC <= 200) {
+                badge.textContent = '🌡️ Помірний нагрів';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800';
+            } else {
+                badge.textContent = '🔥 Сильний нагрів';
+                badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700';
+            }
+
+            // Картки вимірювань
+            document.getElementById('statTempC').textContent = `${formatSign(tC, 0)} °C`;
+            document.getElementById('statTempK').textContent = `${tK.toFixed(1).replace('.', ',')} К`;
+            document.getElementById('statDeltaT').textContent = `${formatSign(deltaT, 0)} °C`;
+
+            document.getElementById('statInitVal').textContent = `${mat.initValue.toFixed(2).replace('.', ',')} ${mat.unit}`;
+            document.getElementById('statCurrVal').textContent = `${currVal.toFixed(3).replace('.', ',')} ${mat.unit}`;
+
+            const decimalsDelta = currentMaterialKey === 'solid' ? 3 : 2;
+            document.getElementById('statDeltaVal').textContent = `${formatSign(deltaVal, decimalsDelta)} ${mat.unit}`;
+        }
+
+        // ==========================================
+        // 5. МАЛЮВАННЯ НАГРІВАЧА / ОХОЛОДЖУВАЧА
+        // ==========================================
+        function drawHeaterElement(ctx, centerX, bottomY, width, timeSec) {
+            const diff = currentTemp - 20;
+            const heaterHeight = 26;
+            const y = bottomY - heaterHeight - 8;
+
+            // Підставка пальника / охолоджувача
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.roundRect(centerX - width / 2, y + 10, width, 14, 6);
+            ctx.fill();
+
+            if (diff > 5) {
+                // Полум'я нагрівача (червоно-помаранчеві язички)
+                const intensity = Math.min(1, diff / 350);
+                const flameCount = 5;
+                const step = (width - 20) / (flameCount - 1);
+
+                for (let i = 0; i < flameCount; i++) {
+                    const fx = (centerX - width / 2 + 10) + i * step;
+                    const wave = Math.sin(timeSec * 12 + i * 1.7) * 4;
+                    const fh = 12 + intensity * 18 + wave;
+
+                    const grad = ctx.createLinearGradient(fx, y + 10, fx, y + 10 - fh);
+                    grad.addColorStop(0, '#ef4444');
+                    grad.addColorStop(0.6, '#f97316');
+                    grad.addColorStop(1, '#facc15');
+
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.moveTo(fx - 7, y + 10);
+                    ctx.quadraticCurveTo(fx - 4, y + 10 - fh * 0.6, fx, y + 10 - fh);
+                    ctx.quadraticCurveTo(fx + 4, y + 10 - fh * 0.6, fx + 7, y + 10);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = '#ea580c';
+                ctx.font = '600 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('🔥 Нагрівання (передача теплоти)', centerX, bottomY - 1);
+
+            } else if (diff < -5) {
+                // Блок охолодження (крижаний синій)
+                const intensity = Math.min(1, Math.abs(diff) / 70);
+                ctx.fillStyle = `rgba(56, 189, 248, ${0.35 + intensity * 0.55})`;
+                ctx.strokeStyle = '#0284c7';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.roundRect(centerX - width / 2 + 6, y - 4, width - 12, 14, 4);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#0369a1';
+                ctx.font = '600 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('❄️ Охолодження (відведення теплоти)', centerX, bottomY - 1);
+            } else {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '500 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Теплова рівновага (20 °C)', centerX, bottomY - 1);
+            }
+        }
+
+        // ==========================================
+        // 6. МАЛЮВАННЯ МАКРОСВІТУ (ЛІВЕ ВІКНО)
+        // ==========================================
+        function renderMacro(timeSec) {
+            const w = macroCanvas.clientWidth;
+            const h = macroCanvas.clientHeight;
+            macroCtx.clearRect(0, 0, w, h);
+
+            const mat = MATERIALS[currentMaterialKey];
+            const deltaT = currentTemp - 20.0;
+            const relExpansion = mat.coeff * deltaT; // ΔL/L0 або ΔV/V0
+            const gain = isMagnified ? mat.visualGain : 1.0;
+            const visualFactor = relExpansion * gain;
+
+            if (currentMaterialKey === 'solid') {
+                // --- МІДНИЙ СТРИЖЕНЬ З ЛІНІЙКОЮ ---
+                const startX = 48;
+                const baseLengthPx = Math.min(w - 150, 240);
+                const deltaPx = baseLengthPx * visualFactor;
+                const currentLengthPx = Math.max(40, baseLengthPx + deltaPx);
+                const rodY = 105;
+                const rodH = 38;
+
+                // Лінійка зверху
+                const rulerY = 62;
+                macroCtx.strokeStyle = '#94a3b8';
+                macroCtx.lineWidth = 1.5;
+                macroCtx.beginPath();
+                macroCtx.moveTo(startX, rulerY);
+                macroCtx.lineTo(startX + baseLengthPx + 95, rulerY);
+                macroCtx.stroke();
+
+                for (let mm = 0; mm <= 130; mm += 10) {
+                    const rx = startX + (mm / 100) * baseLengthPx;
+                    if (rx > w - 20) break;
+                    const isMajor = mm % 50 === 0 || mm === 100;
+                    macroCtx.beginPath();
+                    macroCtx.moveTo(rx, rulerY);
+                    macroCtx.lineTo(rx, rulerY + (isMajor ? 12 : 7));
+                    macroCtx.stroke();
+
+                    if (mm % 20 === 0) {
+                        macroCtx.fillStyle = mm === 100 ? '#1d4ed8' : '#64748b';
+                        macroCtx.font = mm === 100 ? 'bold 11px Inter' : '10px Inter';
+                        macroCtx.textAlign = 'center';
+                        macroCtx.fillText(`${mm}`, rx, rulerY - 6);
+                    }
+                }
+                macroCtx.fillStyle = '#64748b';
+                macroCtx.font = '10px Inter';
+                macroCtx.textAlign = 'left';
+                macroCtx.fillText('мм', startX + baseLengthPx + 75, rulerY - 6);
+
+                // Жорстка опора зліва
+                macroCtx.fillStyle = '#475569';
+                macroCtx.fillRect(startX - 14, rodY - 14, 14, rodH + 28);
+                // Штрихування опори
+                macroCtx.strokeStyle = '#cbd5e1';
+                macroCtx.lineWidth = 1;
+                for (let sy = rodY - 10; sy < rodY + rodH + 14; sy += 8) {
+                    macroCtx.beginPath();
+                    macroCtx.moveTo(startX - 14, sy);
+                    macroCtx.lineTo(startX - 4, sy - 6);
+                    macroCtx.stroke();
+                }
+
+                // Колір мідного стрижня залежно від температури
+                const heatRatio = Math.max(0, Math.min(1, (currentTemp - 20) / 480));
+                const coldRatio = Math.max(0, Math.min(1, (20 - currentTemp) / 70));
+                const rCol = Math.round(217 + heatRatio * 38 - coldRatio * 90);
+                const gCol = Math.round(119 - heatRatio * 45 + coldRatio * 40);
+                const bCol = Math.round(67 - heatRatio * 30 + coldRatio * 130);
+
+                const rodGrad = macroCtx.createLinearGradient(0, rodY, 0, rodY + rodH);
+                rodGrad.addColorStop(0, `rgb(${rCol + 25}, ${gCol + 25}, ${bCol + 25})`);
+                rodGrad.addColorStop(0.5, `rgb(${rCol}, ${gCol}, ${bCol})`);
+                rodGrad.addColorStop(1, `rgb(${Math.max(0, rCol - 35)}, ${Math.max(0, gCol - 35)}, ${Math.max(0, bCol - 35)})`);
+
+                // Основна частина стрижня L0
+                const drawBase = Math.min(baseLengthPx, currentLengthPx);
+                macroCtx.fillStyle = rodGrad;
+                macroCtx.beginPath();
+                macroCtx.roundRect(startX, rodY, drawBase, rodH, [0, deltaPx > 0 ? 0 : 4, deltaPx > 0 ? 0 : 4, 0]);
+                macroCtx.fill();
+
+                // Виділення приросту ΔL (якщо нагріто) або стиснення (якщо охолоджено)
+                if (deltaPx > 1) {
+                    macroCtx.fillStyle = 'rgba(249, 115, 22, 0.85)';
+                    macroCtx.fillRect(startX + baseLengthPx, rodY, deltaPx, rodH);
+                    macroCtx.strokeStyle = '#c2410c';
+                    macroCtx.lineWidth = 1.5;
+                    macroCtx.strokeRect(startX + baseLengthPx, rodY, deltaPx, rodH);
+                } else if (deltaPx < -1) {
+                    // Пунктир початкової довжини L0
+                    macroCtx.strokeStyle = '#3b82f6';
+                    macroCtx.setLineDash([4, 3]);
+                    macroCtx.strokeRect(startX + currentLengthPx, rodY, Math.abs(deltaPx), rodH);
+                    macroCtx.setLineDash([]);
+                }
+
+                // Пунктирна лінія межі L0 = 100 мм
+                const refX = startX + baseLengthPx;
+                macroCtx.strokeStyle = '#2563eb';
+                macroCtx.lineWidth = 1.5;
+                macroCtx.setLineDash([4, 4]);
+                macroCtx.beginPath();
+                macroCtx.moveTo(refX, rulerY + 12);
+                macroCtx.lineTo(refX, rodY + rodH + 24);
+                macroCtx.stroke();
+                macroCtx.setLineDash([]);
+
+                // Підпис L0 та ΔL знизу
+                macroCtx.fillStyle = '#1e293b';
+                macroCtx.font = 'bold 12px Inter';
+                macroCtx.textAlign = 'center';
+                macroCtx.fillText('L₀ = 100 мм', startX + baseLengthPx / 2, rodY + rodH + 22);
+
+                if (Math.abs(deltaPx) > 2) {
+                    macroCtx.fillStyle = deltaPx > 0 ? '#c2410c' : '#1d4ed8';
+                    macroCtx.font = 'bold 12px Inter';
+                    macroCtx.textAlign = 'left';
+                    const labelText = deltaPx > 0 ? `← +ΔL` : `ΔL →`;
+                    macroCtx.fillText(labelText, startX + currentLengthPx + 6, rodY + rodH / 2 + 4);
+                }
+
+                // Нагрівач під стрижнем
+                drawHeaterElement(macroCtx, startX + baseLengthPx / 2, h - 8, baseLengthPx * 0.8, timeSec);
+
+            } else if (currentMaterialKey === 'liquid') {
+                // --- КОЛБА З КАПІЛЯРНОЮ ТРУБКОЮ (ВОДА) ---
+                const cx = w * 0.45;
+                const bulbY = h - 98;
+                const bulbR = 36;
+                const tubeW = 16;
+                const tubeTopY = 26;
+                const baseLevelY = bulbY - 62; // рівень при 20 °C
+
+                // Висота стовпчика рідини у капілярі
+                const deltaH = visualFactor * 95;
+                const currentLevelY = Math.max(tubeTopY + 10, Math.min(bulbY - bulbR + 4, baseLevelY - deltaH));
+
+                // Колір рідини (від крижано-блакитного до тепло-червоного)
+                const tNorm = Math.max(0, Math.min(1, (currentTemp + 50) / 550));
+                const liquidColor = currentTemp < 15 ? '#0284c7' : (currentTemp < 100 ? '#2563eb' : '#e11d48');
+
+                // Заповнення колби та капіляра рідиною
+                macroCtx.fillStyle = liquidColor;
+                // Стовпчик у трубці
+                macroCtx.fillRect(cx - tubeW / 2 + 2, currentLevelY, tubeW - 4, bulbY - currentLevelY);
+                // Кругла колба
+                macroCtx.beginPath();
+                macroCtx.arc(cx, bulbY, bulbR - 2, 0, Math.PI * 2);
+                macroCtx.fill();
+
+                // Виділення приросту об'єму ΔV у трубці
+                if (deltaH > 2) {
+                    macroCtx.fillStyle = '#f97316';
+                    macroCtx.fillRect(cx - tubeW / 2 + 2, currentLevelY, tubeW - 4, baseLevelY - currentLevelY);
+                }
+
+                // Скляний контур колби та трубки
+                macroCtx.strokeStyle = '#475569';
+                macroCtx.lineWidth = 2.5;
+                macroCtx.beginPath();
+                macroCtx.moveTo(cx - tubeW / 2, tubeTopY);
+                macroCtx.lineTo(cx - tubeW / 2, bulbY - bulbR + 5);
+                macroCtx.arc(cx, bulbY, bulbR, -Math.PI * 0.42, Math.PI * 1.42, true);
+                macroCtx.lineTo(cx + tubeW / 2, tubeTopY);
+                macroCtx.stroke();
+
+                // Шкала біля капілярної трубки
+                const scaleX = cx + tubeW / 2 + 12;
+                macroCtx.strokeStyle = '#94a3b8';
+                macroCtx.lineWidth = 1.5;
+                macroCtx.beginPath();
+                macroCtx.moveTo(scaleX, tubeTopY + 8);
+                macroCtx.lineTo(scaleX, bulbY - bulbR);
+                macroCtx.stroke();
+
+                // Позначка V0 (20 °C)
+                macroCtx.strokeStyle = '#2563eb';
+                macroCtx.setLineDash([4, 3]);
+                macroCtx.beginPath();
+                macroCtx.moveTo(cx - 26, baseLevelY);
+                macroCtx.lineTo(scaleX + 18, baseLevelY);
+                macroCtx.stroke();
+                macroCtx.setLineDash([]);
+
+                macroCtx.fillStyle = '#1e293b';
+                macroCtx.font = 'bold 11px Inter';
+                macroCtx.textAlign = 'left';
+                macroCtx.fillText('V₀ = 100 мл (20 °C)', scaleX + 22, baseLevelY + 4);
+
+                if (Math.abs(deltaH) > 3) {
+                    macroCtx.fillStyle = deltaH > 0 ? '#c2410c' : '#0369a1';
+                    macroCtx.fillText(deltaH > 0 ? '▲ Рівень зріс (+ΔV)' : '▼ Рівень впав (-ΔV)', scaleX + 22, currentLevelY + 4);
+                }
+
+                drawHeaterElement(macroCtx, cx, h - 8, 120, timeSec);
+
+            } else {
+                // --- ЦИЛІНДР ІЗ РУХОМИМ ПОРШНЕМ (ГАЗ) ---
+                const cx = w * 0.45;
+                const cylW = 120;
+                const cylBottomY = h - 55;
+                const cylTopY = 24;
+                const baseGasH = 95; // висота стовпа газу при 20 °C
+
+                const currentGasH = Math.max(45, Math.min(cylBottomY - cylTopY - 22, baseGasH * (1 + visualFactor)));
+                const pistonY = cylBottomY - currentGasH;
+
+                // Заповнення газом під поршнем (легкий відтінок залежно від T)
+                const isHot = currentTemp > 30;
+                macroCtx.fillStyle = isHot ? 'rgba(251, 146, 60, 0.18)' : 'rgba(56, 189, 248, 0.18)';
+                macroCtx.fillRect(cx - cylW / 2, pistonY, cylW, currentGasH);
+
+                // Маленькі частинки всередині макро-циліндра для зв'язку з мікросвітом
+                macroCtx.fillStyle = isHot ? '#ea580c' : '#0284c7';
+                const speedMult = 1 + Math.max(0, (currentTemp + 50) / 150);
+                for (let i = 0; i < 14; i++) {
+                    const px = cx - cylW / 2 + 12 + ((Math.sin(timeSec * 2.1 * speedMult + i * 3.1) + 1) / 2) * (cylW - 24);
+                    const py = pistonY + 12 + ((Math.cos(timeSec * 2.7 * speedMult + i * 1.9) + 1) / 2) * (currentGasH - 24);
+                    macroCtx.beginPath();
+                    macroCtx.arc(px, py, 3, 0, Math.PI * 2);
+                    macroCtx.fill();
+                }
+
+                // Стінки циліндра
+                macroCtx.strokeStyle = '#334155';
+                macroCtx.lineWidth = 3;
+                macroCtx.beginPath();
+                macroCtx.moveTo(cx - cylW / 2, cylTopY);
+                macroCtx.lineTo(cx - cylW / 2, cylBottomY);
+                macroCtx.lineTo(cx + cylW / 2, cylBottomY);
+                macroCtx.lineTo(cx + cylW / 2, cylTopY);
+                macroCtx.stroke();
+
+                // Рухомий поршень
+                macroCtx.fillStyle = '#64748b';
+                macroCtx.fillRect(cx - cylW / 2 + 2, pistonY - 12, cylW - 4, 12);
+                macroCtx.fillStyle = '#94a3b8';
+                macroCtx.fillRect(cx - 6, pistonY - 34, 12, 22);
+
+                // Позначка початкового об'єму V0
+                const basePistonY = cylBottomY - baseGasH;
+                macroCtx.strokeStyle = '#2563eb';
+                macroCtx.setLineDash([4, 3]);
+                macroCtx.beginPath();
+                macroCtx.moveTo(cx - cylW / 2 - 10, basePistonY);
+                macroCtx.lineTo(cx + cylW / 2 + 16, basePistonY);
+                macroCtx.stroke();
+                macroCtx.setLineDash([]);
+
+                macroCtx.fillStyle = '#1e293b';
+                macroCtx.font = 'bold 11px Inter';
+                macroCtx.textAlign = 'left';
+                macroCtx.fillText('V₀ = 100 мл', cx + cylW / 2 + 20, basePistonY + 4);
+
+                const deltaH = currentGasH - baseGasH;
+                if (Math.abs(deltaH) > 4) {
+                    macroCtx.fillStyle = deltaH > 0 ? '#c2410c' : '#0369a1';
+                    macroCtx.fillText(deltaH > 0 ? '▲ Поршень піднявся (+ΔV)' : '▼ Поршень опустився (-ΔV)', cx + cylW / 2 + 20, pistonY - 2);
+                }
+
+                drawHeaterElement(macroCtx, cx, h - 8, cylW + 10, timeSec);
+            }
+        }
+
+        // ==========================================
+        // 7. ОНОВЛЕННЯ ТА МАЛЮВАННЯ МІКРОСВІТУ (ПРАВЕ ВІКНО)
+        // ==========================================
+        function renderMicro(dt, timeSec) {
+            const w = microCanvas.clientWidth;
+            const h = microCanvas.clientHeight;
+            microCtx.clearRect(0, 0, w, h);
+
+            // Температурний фактор швидкості та амплітуди (від 0.2 при -50°C до 2.6 при 500°C)
+            const kelvin = currentTemp + 273.15;
+            const tempRatio = kelvin / 293.15; // 1.0 при 20 °C
+            const speedFactor = Math.sqrt(tempRatio);
+
+            if (currentMaterialKey === 'solid') {
+                // --- КРИСТАЛІЧНА ҐРАТКА ТВЕРДОГО ТІЛА ---
+                const cx = w / 2;
+                const cy = h / 2;
+
+                // Відстань між атомами збільшується пропорційно температурі
+                const baseSpacingX = Math.min(54, w / 8.5);
+                const baseSpacingY = Math.min(48, h / 6.5);
+                const spacingMult = 1 + (currentTemp - 20) * 0.00055;
+                const spacingX = baseSpacingX * spacingMult;
+                const spacingY = baseSpacingY * spacingMult;
+
+                // Амплітуда теплових коливань
+                const amp = Math.max(1.5, 4.5 * tempRatio);
+                const freqMult = 7.5 * speedFactor;
+
+                // Оновлення координат
+                microParticles.forEach(p => {
+                    const eqX = cx + p.gridCol * spacingX;
+                    const eqY = cy + p.gridRow * spacingY;
+                    if (!isPaused) {
+                        p.phaseX += dt * freqMult * p.freqX;
+                        p.phaseY += dt * freqMult * p.freqY;
+                    }
+                    p.x = eqX + Math.sin(p.phaseX) * amp;
+                    p.y = eqY + Math.cos(p.phaseY) * amp;
+                });
+
+                // Малювання міжатомних зв'язків ("пружинок")
+                microCtx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+                microCtx.lineWidth = 1.5;
+                for (let i = 0; i < microParticles.length; i++) {
+                    for (let j = i + 1; j < microParticles.length; j++) {
+                        const p1 = microParticles[i];
+                        const p2 = microParticles[j];
+                        if (Math.abs(p1.gridCol - p2.gridCol) + Math.abs(p1.gridRow - p2.gridRow) === 1) {
+                            microCtx.beginPath();
+                            microCtx.moveTo(p1.x, p1.y);
+                            microCtx.lineTo(p2.x, p2.y);
+                            microCtx.stroke();
+                        }
+                    }
+                }
+
+                // Малювання атомів міді (фіксований радіус = 12 px)
+                const atomRadius = 12;
+                microParticles.forEach(p => {
+                    const grad = microCtx.createRadialGradient(p.x - 3, p.y - 3, 2, p.x, p.y, atomRadius);
+                    grad.addColorStop(0, '#fed7aa');
+                    grad.addColorStop(0.5, '#ea580c');
+                    grad.addColorStop(1, '#9a3412');
+
+                    microCtx.fillStyle = grad;
+                    microCtx.beginPath();
+                    microCtx.arc(p.x, p.y, atomRadius, 0, Math.PI * 2);
+                    microCtx.fill();
+                });
+
+                // Індикатор середньої відстані між атомами
+                const pA = microParticles[16];
+                const pB = microParticles[17];
+                if (pA && pB) {
+                    const yLine = pA.y + 22;
+                    microCtx.strokeStyle = '#2563eb';
+                    microCtx.lineWidth = 1.5;
+                    microCtx.beginPath();
+                    microCtx.moveTo(pA.x, yLine);
+                    microCtx.lineTo(pB.x, yLine);
+                    microCtx.stroke();
+
+                    microCtx.fillStyle = '#1d4ed8';
+                    microCtx.font = 'bold 11px Inter';
+                    microCtx.textAlign = 'center';
+                    microCtx.fillText(`d = ${(spacingMult * 0.256).toFixed(3)} нм`, (pA.x + pB.x) / 2, yLine + 14);
+                }
+
+            } else if (currentMaterialKey === 'liquid') {
+                // --- МОЛЕКУЛИ РІДИНИ (ВОДИ) ---
+                // Рівень рідини у вікні мікросвіту піднімається при нагріванні
+                const fillRatio = Math.max(0.45, Math.min(0.88, 0.62 + (currentTemp - 20) * 0.00048));
+                const surfaceY = h * (1 - fillRatio);
+
+                // Фон води
+                microCtx.fillStyle = 'rgba(219, 234, 254, 0.55)';
+                microCtx.fillRect(0, surfaceY, w, h - surfaceY);
+
+                // Лінія вільної поверхні рідини
+                microCtx.strokeStyle = '#3b82f6';
+                microCtx.lineWidth = 2;
+                microCtx.beginPath();
+                microCtx.moveTo(0, surfaceY);
+                microCtx.lineTo(w, surfaceY);
+                microCtx.stroke();
+
+                microCtx.fillStyle = '#1d4ed8';
+                microCtx.font = '600 11px Inter';
+                microCtx.textAlign = 'right';
+                microCtx.fillText('Рівень рідини', w - 12, surfaceY - 6);
+
+                const baseSpeed = 55 * speedFactor;
+
+                if (!isPaused) {
+                    microParticles.forEach(p => {
+                        p.x += p.vx * baseSpeed * dt;
+                        p.y += p.vy * baseSpeed * dt;
+
+                        // Легка гравітація вниз, щоб молекули трималися в об'ємі рідини
+                        p.vy += 18 * dt;
+
+                        // Обмеження стінками та поверхнею
+                        if (p.x < p.radius + 6) { p.x = p.radius + 6; p.vx = Math.abs(p.vx); }
+                        if (p.x > w - p.radius - 6) { p.x = w - p.radius - 6; p.vx = -Math.abs(p.vx); }
+                        if (p.y < surfaceY + p.radius) { p.y = surfaceY + p.radius; p.vy = Math.abs(p.vy) * 0.8; }
+                        if (p.y > h - p.radius - 6) { p.y = h - p.radius - 6; p.vy = -Math.abs(p.vy) * 0.8; }
+                    });
+
+                    // Пружні зіткнення між молекулами рідини
+                    for (let i = 0; i < microParticles.length; i++) {
+                        for (let j = i + 1; j < microParticles.length; j++) {
+                            const p1 = microParticles[i];
+                            const p2 = microParticles[j];
+                            const dx = p2.x - p1.x;
+                            const dy = p2.y - p1.y;
+                            const dist = Math.hypot(dx, dy);
+                            // Ефективний радіус відштовхування трохи зростає з температурою
+                            const minDist = (p1.radius + p2.radius) * (1 + (currentTemp - 20) * 0.00035);
+                            if (dist < minDist && dist > 0.01) {
+                                const overlap = (minDist - dist) * 0.5;
+                                const nx = dx / dist;
+                                const ny = dy / dist;
+                                p1.x -= nx * overlap;
+                                p1.y -= ny * overlap;
+                                p2.x += nx * overlap;
+                                p2.y += ny * overlap;
+
+                                const dvx = p1.vx - p2.vx;
+                                const dvy = p1.vy - p2.vy;
+                                const dot = dvx * nx + dvy * ny;
+                                if (dot > 0) {
+                                    p1.vx -= dot * nx;
+                                    p1.vy -= dot * ny;
+                                    p2.vx += dot * nx;
+                                    p2.vy += dot * ny;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Малювання молекул H2O
+                microParticles.forEach(p => {
+                    microCtx.fillStyle = '#2563eb';
+                    microCtx.beginPath();
+                    microCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    microCtx.fill();
+
+                    // Два атоми водню для впізнаваності H2O
+                    microCtx.fillStyle = '#93c5fd';
+                    microCtx.beginPath();
+                    microCtx.arc(p.x - 7, p.y - 7, 4.5, 0, Math.PI * 2);
+                    microCtx.arc(p.x + 7, p.y - 7, 4.5, 0, Math.PI * 2);
+                    microCtx.fill();
+                });
+
+            } else {
+                // --- ХАОТИЧНІ МОЛЕКУЛИ ГАЗУ ПІД ПОРШНЕМ ---
+                // Висота положення поршня у вікні мікросвіту
+                const spaceRatio = Math.max(0.38, Math.min(0.92, 0.55 + (currentTemp - 20) * 0.00075));
+                const ceilingY = h * (1 - spaceRatio);
+
+                // Поршень зверху в мікросвіті
+                microCtx.fillStyle = '#cbd5e1';
+                microCtx.fillRect(0, 0, w, ceilingY);
+                microCtx.fillStyle = '#475569';
+                microCtx.fillRect(0, ceilingY - 8, w, 8);
+
+                microCtx.fillStyle = '#334155';
+                microCtx.font = 'bold 11px Inter';
+                microCtx.textAlign = 'center';
+                microCtx.fillText('Рухомий поршень', w / 2, Math.max(14, ceilingY - 14));
+
+                const baseSpeed = 135 * speedFactor;
+
+                if (!isPaused) {
+                    microParticles.forEach(p => {
+                        p.x += p.vx * baseSpeed * dt;
+                        p.y += p.vy * baseSpeed * dt;
+
+                        if (p.x < p.radius + 4) { p.x = p.radius + 4; p.vx = Math.abs(p.vx); }
+                        if (p.x > w - p.radius - 4) { p.x = w - p.radius - 4; p.vx = -Math.abs(p.vx); }
+                        if (p.y < ceilingY + p.radius) { p.y = ceilingY + p.radius; p.vy = Math.abs(p.vy); }
+                        if (p.y > h - p.radius - 4) { p.y = h - p.radius - 4; p.vy = -Math.abs(p.vy); }
+                    });
+
+                    // Пружні зіткнення молекул газу
+                    for (let i = 0; i < microParticles.length; i++) {
+                        for (let j = i + 1; j < microParticles.length; j++) {
+                            const p1 = microParticles[i];
+                            const p2 = microParticles[j];
+                            const dx = p2.x - p1.x;
+                            const dy = p2.y - p1.y;
+                            const dist = Math.hypot(dx, dy);
+                            const minDist = p1.radius + p2.radius;
+                            if (dist < minDist && dist > 0.01) {
+                                const overlap = (minDist - dist) * 0.5;
+                                const nx = dx / dist;
+                                const ny = dy / dist;
+                                p1.x -= nx * overlap;
+                                p1.y -= ny * overlap;
+                                p2.x += nx * overlap;
+                                p2.y += ny * overlap;
+
+                                const dvx = p1.vx - p2.vx;
+                                const dvy = p1.vy - p2.vy;
+                                const dot = dvx * nx + dvy * ny;
+                                if (dot > 0) {
+                                    p1.vx -= dot * nx;
+                                    p1.vy -= dot * ny;
+                                    p2.vx += dot * nx;
+                                    p2.vy += dot * ny;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Малювання молекул газу зі слідами швидкості
+                microParticles.forEach(p => {
+                    // Вектор швидкості
+                    microCtx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+                    microCtx.lineWidth = 1.5;
+                    microCtx.beginPath();
+                    microCtx.moveTo(p.x, p.y);
+                    microCtx.lineTo(p.x + p.vx * (14 * speedFactor), p.y + p.vy * (14 * speedFactor));
+                    microCtx.stroke();
+
+                    microCtx.fillStyle = p.isOxygen ? '#ef4444' : '#0284c7';
+                    microCtx.beginPath();
+                    microCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    microCtx.fill();
+                });
+            }
+        }
+
+        // ==========================================
+        // 8. ГОЛОВНИЙ ЦИКЛ АНІМАЦІЇ (60 FPS)
+        // ==========================================
+        function animationLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const dt = Math.min(0.05, (timestamp - lastTime) / 1000);
+            lastTime = timestamp;
+            const timeSec = timestamp / 1000;
+
+            if (!isPaused) {
+                // Плавна зміна температури при натисканні швидких кнопок
+                const tempDiff = targetTemp - currentTemp;
+                if (Math.abs(tempDiff) > 0.2) {
+                    currentTemp += tempDiff * Math.min(1, dt * 6);
+                    document.getElementById('tempSlider').value = Math.round(currentTemp);
+                    updateReadouts();
+                } else if (currentTemp !== targetTemp) {
+                    currentTemp = targetTemp;
+                    updateReadouts();
+                }
+            }
+
+            renderMacro(timeSec);
+            renderMicro(dt, timeSec);
+
+            requestAnimationFrame(animationLoop);
+        }
+
+        // ==========================================
+        // 9. ІНТЕРАКТИВНИЙ МІНІ-ТЕСТ ДЛЯ 8 КЛАСУ
+        // ==========================================
+        const QUIZ_QUESTIONS = [
+            {
+                q: '1. Чому тверді тіла, рідини та гази розширюються під час нагрівання?',
+                options: [
+                    'Збільшуються розміри самих атомів і молекул',
+                    'Збільшується середня відстань між частинками через інтенсивніший тепловий рух',
+                    'У тілі утворюються нові атоми'
+                ],
+                correct: 1,
+                explanation: 'Правильно! Розміри самих атомів не змінюються, але зі зростанням температури частинки рухаються швидше і сильніше відштовхуються, тому проміжки між ними зростають.'
+            },
+            {
+                q: '2. Яка речовина за однакової зміни температури розширюється найбільше?',
+                options: [
+                    'Тверде тіло (наприклад, мідь)',
+                    'Рідина (наприклад, вода)',
+                    'Газ (наприклад, повітря)'
+                ],
+                correct: 2,
+                explanation: 'Вірно! У газах сили притягання між молекулами дуже слабкі, тому при нагріванні вони розлітаються набагато сильніше, ніж частинки у рідинах чи твердих тілах.'
+            },
+            {
+                q: '3. Навіщо між залізничними рейками залишають невеликі проміжки (теплові зазори)?',
+                options: [
+                    'Щоб рейки не деформувалися під час теплового розширення влітку',
+                    'Для зменшення ваги залізничного полотна',
+                    'Щоб потяг рухався повільніше'
+                ],
+                correct: 0,
+                explanation: 'Саме так! У спекотну погоду сталеві рейки нагріваються та видовжуються. Зазори дозволяють їм вільно розширюватися без викривлення колії.'
+            },
+            {
+                q: '4. Яке фізичне явище покладено в основу роботи спиртового або ртутного термометра?',
+                options: [
+                    'Теплове розширення рідини в капілярній трубці при нагріванні',
+                    'Зміна маси рідини при зміні температури',
+                    'Теплове розширення скла швидше, ніж рідини'
+                ],
+                correct: 0,
+                explanation: 'Молодець! Рідина в термометрі розширюється набагато сильніше за скляну трубку, тому при нагріванні стовпчик рідини піднімається вгору.'
+            }
+        ];
+
+        let answeredSet = new Set();
+        let scoreCount = 0;
+
+        function renderQuiz() {
+            const container = document.getElementById('quizGrid');
+            container.innerHTML = '';
+
+            QUIZ_QUESTIONS.forEach((item, qIndex) => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col justify-between gap-3';
+
+                const title = document.createElement('p');
+                title.className = 'text-sm font-bold text-slate-800';
+                title.textContent = item.q;
+                card.appendChild(title);
+
+                const optsDiv = document.createElement('div');
+                optsDiv.className = 'flex flex-col gap-2';
+
+                const feedback = document.createElement('div');
+                feedback.className = 'hidden text-xs p-2.5 rounded-lg leading-relaxed';
+
+                item.options.forEach((optText, optIndex) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'text-left text-xs sm:text-sm p-2.5 rounded-lg bg-white hover:bg-blue-50 border border-slate-200 text-slate-700 font-medium transition';
+                    btn.textContent = optText;
+
+                    btn.onclick = () => {
+                        if (answeredSet.has(qIndex)) return;
+                        answeredSet.add(qIndex);
+
+                        const allBtns = optsDiv.querySelectorAll('button');
+                        allBtns.forEach((b, idx) => {
+                            b.disabled = true;
+                            if (idx === item.correct) {
+                                b.className = 'text-left text-xs sm:text-sm p-2.5 rounded-lg bg-emerald-50 border border-emerald-400 text-emerald-900 font-bold';
+                            } else if (idx === optIndex) {
+                                b.className = 'text-left text-xs sm:text-sm p-2.5 rounded-lg bg-rose-50 border border-rose-400 text-rose-900 font-semibold';
+                            } else {
+                                b.className = 'text-left text-xs sm:text-sm p-2.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-400';
+                            }
+                        });
+
+                        if (optIndex === item.correct) {
+                            scoreCount++;
+                            document.getElementById('quizScore').textContent = scoreCount;
+                            feedback.className = 'block text-xs p-2.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200';
+                        } else {
+                            feedback.className = 'block text-xs p-2.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200';
+                        }
+                        feedback.textContent = item.explanation;
+                    };
+
+                    optsDiv.appendChild(btn);
+                });
+
+                card.appendChild(optsDiv);
+                card.appendChild(feedback);
+                container.appendChild(card);
+            });
+        }
+
+        function resetQuiz() {
+            answeredSet.clear();
+            scoreCount = 0;
+            document.getElementById('quizScore').textContent = '0';
+            renderQuiz();
+        }
+
+        // ==========================================
+        // 10. ЗАПУСК ДОДАТКУ
+        // ==========================================
+        window.onload = function() {
+            resizeCanvases();
+            selectMaterial('solid');
+            updateReadouts();
+            renderQuiz();
+            requestAnimationFrame(animationLoop);
+        };
+    </script>
+</body>
+</html>
